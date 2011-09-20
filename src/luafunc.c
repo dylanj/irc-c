@@ -31,7 +31,6 @@ int LUAGetNick( lua_State *L ) {
 }
 
 int LUAJoinChannel( lua_State *L ) {
-	printf( "lua - join channel\n" );
 	char *channel = (char *) lua_tostring( L, 1 );
 	botState *b = LUAGetBotState( L );
 	

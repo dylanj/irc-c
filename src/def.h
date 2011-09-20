@@ -1,10 +1,10 @@
+#ifndef BOTSTATE_H
+#define BOTSTATE_H
+
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
 #include <stdarg.h>
-
-#ifndef BOTSTATE_H
-#define BOTSTATE_H
 
 #define DEBUG 1
 #define BUFLEN 2048
@@ -33,7 +33,7 @@ typedef struct botstate_s {
 	int   pluginCount;
 
 	lua_State *pluginStates[MAX_PLUGINS];	// lua states.
-} __attribute__ ((packed)) botState;
+} botState;
 
 void Log( botState *bot, char *format, ... ); 
 

@@ -1,3 +1,4 @@
+#include "def.h"
 #include "irc.h"
 #include "bot.h"
 
@@ -5,8 +6,8 @@
 void Log( botState *bot, char *format, ... ) {
 	va_list args;
 	char buffer[SOCKET_BUF_LEN*2];
-
-  	va_start( args, format );
+  	
+	va_start( args, format );
 	vsprintf( buffer, format, args );
 	fprintf( bot->log, "%s", buffer );
 	va_end( args );
@@ -45,7 +46,7 @@ int IRCSendRaw( botState *bot, char* format, ... ) {
 	vsprintf( buffer, format, args );
 	
 	len = send( bot->socket, buffer, strlen( buffer ), 0 );
-	Log( bot, "-> %s\n", len, buffer );
+	Log( bot, "-> %s\n", buffer );
 	
 	va_end( args );
 	return len;
@@ -54,27 +55,37 @@ int IRCSendRaw( botState *bot, char* format, ... ) {
 // deal with irc protocol
 int IRCParse( botState *bot, char* line ) {
 	
-	//printf( "%s\n", line );
-	Log( bot, "<- %s\n", line );
 	int returns =  1; // success.
+	char *fromstr, *protostr, *tostr, *msgstr, *chanstr, *userstr;
+	
+	// makes this a lot easier to understand
+	fromstr = bot->msg[0];
+	protostr = bot->msg[1];
+	chanstr = bot->msg[1]; // used in KICK
+	userstr = bot->msg[1]; // used in KICK 
+	tostr = bot->msg[2];
+	msgstr = bot->msg[3];
+
+	Log( bot, "<- %s\n", line );
 
 	// clear mem for fields.
 	for( int i = 0; i < PROTOCOL_FIELDS; i++ )
 		memset( bot->msg[i], 0, SOCKET_BUF_LEN );
 	
+	// quickly check if ping
 	if ( strncmp( line, "PING", 4 ) == 0 ) {
-		sscanf( line, "PING :%s", bot->msg[0] );
-		IRCSendPong( bot, bot->msg[0] );
+		sscanf( line, "PING :%s", msgstr );
+		IRCSendPong( bot, msgstr );
 		return returns;
 	}
 	
 	// split message up
-	sscanf(	line, ":%s %s %s :%[^\n]", bot->msg[0], bot->msg[1], bot->msg[2], bot->msg[3] );
+	sscanf(	line, ":%s %s %s :%[^\n]", fromstr, protostr, tostr, msgstr );
 	
 	// quick - if it's len 3 then it's a number, otherwise it's a string.
-	int protoLength = strlen( bot->msg[1] );
+	int protoLength = strlen( protostr );
 	if ( protoLength == 3 ) {
-		int protoNum = atoi( bot->msg[1] );
+		int protoNum = atoi( protostr );
 		switch( protoNum ) {
 			case 1:
 				IRCSendMode( bot, "+i" );
@@ -85,54 +96,56 @@ int IRCParse( botState *bot, char* line ) {
 				printf( "really dont care about this stuff\n" );
 				break;
 			case 5:
-				printf( "important server info:\n%s\n", bot->msg[3] );
+				printf( "important server info:\n%s\n", msgstr );
 				break;
 			case 375:
-				printf( "motd start: %s\n", bot->msg[3] );
+				printf( "motd start: %s\n", msgstr );
 				break;
 			case 372:
-				printf( "motd: %s\n", bot->msg[3] );
+				printf( "motd: %s\n", msgstr );
 				break;
 			case 376:
-				printf( "motd end: %s\n", bot->msg[3] );
+				printf( "motd end: %s\n", msgstr );
 				OnMOTDFinish( bot );
 				//IRCJoinChannel( bot, "#C++" );
 				break;
 			default:
-				printf( "unknown(%i) \"%s\"\n", protoNum, bot->msg[1] );
+				printf( "unknown(%i) \"%s\"\n", protoNum, protostr );
 		}
 	}
 	
-	if ( strcmp( bot->msg[1], "PRIVMSG" ) == 0 ) {
+	if ( strcmp( protostr, "PRIVMSG" ) == 0 ) {
 		//printf( "private message from %s\nto: %s\nmsg: %s\n", bot->msg[0], bot->msg[2], bot->msg[3] );
 		
-		OnPrivateMessage( bot, bot->msg[0], bot->msg[2], bot->msg[3] );
+		OnPrivateMessage( bot, fromstr, tostr, msgstr );
 		
-		if ( strcmp( "!killbot", bot->msg[3] ) == 0 ) {
+		if ( strcmp( msgstr, "!killbot" ) == 0 ) {
 			printf( "asked to quit\n" );
 			returns = -1;
 		}
 
 	} 
-	else if ( strcmp( bot->msg[1], "NOTICE" ) == 0 ) {
-		OnNotice( bot, bot->msg[0], bot->msg[2], bot->msg[3] );
+	else if ( strcmp( protostr, "NOTICE" ) == 0 ) {
+		OnNotice( bot, fromstr, tostr, msgstr );
 	}
-	else if ( strcmp( bot->msg[1], "PING" ) == 0 ) {
-		IRCSendPong( bot, bot->msg[3] );
+	else if ( strcmp( protostr, "PING" ) == 0 ) {
+		IRCSendPong( bot, msgstr );
 	}
-	else if ( strcmp( bot->msg[1], "JOIN" ) == 0 ) {
-		OnJoin( bot, bot->msg[0], bot->msg[2] );
+	else if ( strcmp( protostr, "JOIN" ) == 0 ) {
+		OnJoin( bot, fromstr, tostr );
 	}
-	else if ( strcmp( bot->msg[1], "PART" ) == 0 ) {
-		OnPart( bot, bot->msg[0], bot->msg[2], bot->msg[3] );
+	else if ( strcmp( protostr, "PART" ) == 0 ) {
+		OnPart( bot, fromstr, tostr, msgstr );
 	}
-	else if ( strcmp( bot->msg[1], "INVITE" ) == 0 ) {
-		OnInvite( bot, bot->msg[0], bot->msg[2] );
+	else if ( strcmp( protostr, "INVITE" ) == 0 ) {
+		OnInvite( bot, fromstr, tostr );
 	}
 	// from kick channel user :msg
-	else if ( strcmp( bot->msg[1], "KICK" ) == 0 ) {
-		sscanf( line, "%s %s %s %s :%[^\n]", bot->msg[0], bot->msg[1], bot->msg[2], bot->msg[3], bot->msg[4] );
-		OnKick( bot, bot->msg[0], bot->msg[2], bot->msg[3], bot->msg[4] );
+	else if ( strcmp( protostr, "KICK" ) == 0 ) {
+		chanstr = bot->msg[2]; // used in KICK
+		userstr = bot->msg[3]; // used in KICK 
+		sscanf( line, "%s %s %s %s :%[^\n]", fromstr, protostr, chanstr, userstr, msgstr );
+		OnKick( bot, fromstr, chanstr, userstr, msgstr );
 	}
 	
 	return returns;
@@ -235,6 +248,7 @@ void IRCJoinChannel( botState *bot, char* channel ) {
 void IRCSetNick( botState *bot, char* nick ) {
 	if ( nick == NULL || strlen( nick ) < 2 )
 		nick = bot->nick;
+	
 	IRCSendRaw( bot, "NICK %s\r\n", nick );
 }
 

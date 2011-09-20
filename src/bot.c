@@ -93,11 +93,14 @@ int BotLoad( lua_State *L ) {
 	char *filename = (char*) lua_tostring(L, 1);
 	char *nick, *altnick, *fullname, *server, *autosendcmd;
 	
-	BotStates[botCount].log = fopen( "log", "a" );
-
+	BotStates[botCount].log = fopen( "./raw.log", "w+" );
+	if ( BotStates[botCount].log == NULL ) {
+		printf( "problem opening dealing with logfile\n" );
+	}
+	
 	Log( &BotStates[botCount], "!!!\nloading bot: %s\n", filename );
 
-	if ( strlen( filename ) < 0 ) {
+	if ( strlen( filename ) == 0 ) {
 		#if DEBUG
 		fprintf( stderr, "failed loading bot\n" );
 		#endif
