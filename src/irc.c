@@ -6,7 +6,7 @@
 void Log( botState *bot, char *format, ... ) {
 	va_list args;
 	char buffer[SOCKET_BUF_LEN*2];
-  	
+
 	va_start( args, format );
 	vsprintf( buffer, format, args );
 	fprintf( bot->log, "%s", buffer );
@@ -55,7 +55,7 @@ int IRCSendRaw( botState *bot, char* format, ... ) {
 // deal with irc protocol
 int IRCParse( botState *bot, char* line ) {
 	
-	int returns =  1; // success.
+	int returns = 1; // success.
 	char *fromstr, *protostr, *tostr, *msgstr, *chanstr, *userstr;
 	
 	// makes this a lot easier to understand

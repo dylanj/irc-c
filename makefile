@@ -20,7 +20,7 @@ ku: $(objects)
 obj/%.o : %.c $(headers)
 	$(CC) $(CPPFLAGS) -c -g -o $@ $<
 
-.PHONY: setup clean git
+.PHONY: setup clean
 
 setup:
 	mkdir obj
@@ -30,6 +30,3 @@ clean:
 	rm $(objects)
 	rm $(OUTDIR)/$(PROGRAM)
 
-git:
-	git push -u origin master
-	
