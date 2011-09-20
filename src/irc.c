@@ -115,15 +115,12 @@ int IRCParse( botState *bot, char* line ) {
 	}
 	
 	if ( strcmp( protostr, "PRIVMSG" ) == 0 ) {
-		//printf( "private message from %s\nto: %s\nmsg: %s\n", bot->msg[0], bot->msg[2], bot->msg[3] );
-		
 		OnPrivateMessage( bot, fromstr, tostr, msgstr );
 		
 		if ( strcmp( msgstr, "!killbot" ) == 0 ) {
 			printf( "asked to quit\n" );
 			returns = -1;
 		}
-
 	} 
 	else if ( strcmp( protostr, "NOTICE" ) == 0 ) {
 		OnNotice( bot, fromstr, tostr, msgstr );
@@ -158,7 +155,6 @@ int IRCParseRaw( botState *bot, char* buffer ) {
 	char line[SOCKET_BUF_LEN];
 	int returns = 1; //success
 	char* buftemp;
-	int lnum = 0;
 	buftemp = buffer;
 
 	// deal with left over message
@@ -179,24 +175,16 @@ int IRCParseRaw( botState *bot, char* buffer ) {
 
 		memset( bot->rawCarry, 0, SOCKET_BUF_LEN );
 	}
-
-	if ( returns == -1 ) {
+	
+	// check for errors.
+	if ( returns == -1 )
 		return returns;
-	}
-
 
 	while( 1 ) {
-		lnum++;
 		memset( line, 0, SOCKET_BUF_LEN );
-		//printf( "0x%x - 0x%x\n", buffer, buftemp );
 		sscanf( buftemp, "%[^\n]", line );
 		 
 		int lineLength = strlen( line );
-		// if line doesn't end with an \r than the message was not received
-		// in full. save the str and parse it and next time this function
-		// is called glue it to the the front of the buffer.
-		//printf( "linelenth: %i", lineLength );
-
 		if ( lineLength == 0 )
 			break;
 		
@@ -227,7 +215,6 @@ void IRCHandleConnection( botState *bot ) {
 	while( 1 ) {
 		memset( buffer, 0, SOCKET_BUF_LEN ); // zero out buffer
 		recv_length = recv( bot->socket, buffer, SOCKET_BUF_LEN, 0 );
-		//Log( "<- %s", buffer );
 		
 		if ( recv_length == 0 ) 
 			break;
@@ -235,7 +222,6 @@ void IRCHandleConnection( botState *bot ) {
 		if ( IRCParseRaw( bot, buffer ) == -1 )
 			break;
 	}
-	
 }
 
 // join the channel

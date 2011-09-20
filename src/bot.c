@@ -3,45 +3,46 @@
 botState BotStates[MAX_BOTS];
 int botCount = 0;
 
-// loads the plugin ( pluginPath ) in the bot state ( bot ).
-int BotLoadPlugin( botState *bot, char* pluginName ) {
-	lua_State *L = bot->pluginStates[bot->pluginCount] = lua_open();
-		
-	char *pluginPath = alloca( strlen( PLUGIN_PATH ) + strlen( pluginName ) );
-	sprintf( pluginPath, "%s%s", PLUGIN_PATH, pluginName );
+// connect bot to irc network.
+int BotConnect( botState *bot ) {
+	
+	BotInfo( bot );
 
-	luaL_openlibs( L );
-	int loadStatus = luaL_loadfile( L, pluginPath );
+	struct sockaddr_in server_addr;
+	struct hostent *server_host;
 
-	switch( loadStatus ) {
-		case LUA_ERRFILE:
-			printf( "couldn't open %s.", pluginPath );
-			return 0;
-		case LUA_ERRMEM:
-			printf( "memory error in %s.", pluginPath );
-			return 0;
-		case LUA_ERRSYNTAX:
-			printf( "syntax error in %s.", pluginPath );
-			lua_error( L );
-			return 0;
-		default:
-			printf( "unknown error %i in %s", loadStatus, pluginPath );
+	bot->socket = socket( AF_INET, SOCK_STREAM, 0 );
+
+	if ( bot->socket < 0 ) {
+		fprintf( stderr, "Failed to create socket [%i]\n", errno );
+		perror( "socket" );
+		return 0;
 	}
 
-	// this is the plugins ptr to the bot in which it sits in.
-	lua_pushlightuserdata( L, bot );
-	lua_setglobal( L, "botptr" );
+	printf( "trying to resolve hostname: %s\n", bot->hostname );
+	server_host = gethostbyname( bot->hostname );
+	if ( server_host == NULL ) {
+		fprintf( stderr, "failed to lookup hostname [%i]\n", errno );
+		perror( "gethostbyname" );
+		return 0;
+	}
+	
+	server_addr.sin_addr = *(struct in_addr *) server_host->h_addr_list[0];
+	server_addr.sin_port = htons( bot->port );
+	server_addr.sin_family = AF_INET;
+	
+	if ( connect( bot->socket, (struct sockaddr*) &server_addr, sizeof( server_addr ) ) < 0 ) {
+		fprintf( stderr, "error connecting[%i]", errno );
+		perror( "connect" );
+		return 0;
+	}
 
-	// let lua know about some functions
-	BotGiveEvents( bot, bot->pluginCount );
-
-	lua_pcall( L, 0, 0, 0 );
-
-	bot->pluginCount++;
+	printf( "connected!\n" );
 
 	return 1;
 }
 
+// these are events that can be called from within lua scripts
 void BotGiveEvents( botState *bot, int pluginId ) {
 	lua_register( bot->pluginStates[pluginId], "SendMessage", LUASendMessage );
 	lua_register( bot->pluginStates[pluginId], "SetNick", LUASetNick );
@@ -51,44 +52,19 @@ void BotGiveEvents( botState *bot, int pluginId ) {
 	lua_register( bot->pluginStates[pluginId], "GetUsers", LUAGetUsers );
 }
 
-// disconnects bot, destroys lua instances and cleans up.
-void BotUnload( botState *bot ) {
-
-	// simply for debugging
-	char* name = alloca( strlen( bot->nick ) + 1);
-	strcpy( name, bot->nick );
-
-	// unload plugins.
+// print info about bot
+void BotInfo( botState *bot ) {
+	printf( "nick: %s\naltnick: %s\nhostname: %s\nfullname: %s\n\
+server: %s\nautosendcmd: %s\nport: %i\nsocket: %i\nplugin count: %i\nplugins:\n",
+	bot->nick, bot->altnick, bot->hostname, bot->fullname, bot->server, 
+	bot->autosendcmd, bot->port, bot->socket, bot->pluginCount );
+	
 	for( int i = 0; i < bot->pluginCount; i++ ) {
-		lua_close( bot->pluginStates[i] );
+		printf( "%i: %s\n", i, bot->pluginNames[i] );
 	}
-
-	free( bot->nick );
-	free( bot->altnick );
-	free( bot->fullname );
-	free( bot->autosendcmd );
-	free( bot->rawCarry );
-
-	if ( bot->hostname == bot->server ) {
-		free( bot->server );
-	} else {
-		free( bot->server );
-		free( bot->hostname );
-	}
-	
-	// free memory we use for dealing with individual lines
-	for( int i = 0; i < PROTOCOL_FIELDS; i++ )
-		free( bot->msg[i] );
-	
-	// the array
-	free( bot->msg );
-
-	Log( bot, "finished cleaning up\n" );
-
-	printf( "finished cleaning up bot [%s]\n", name );
 }
 
-// loads a new bot.
+// loads a new bot
 int BotLoad( lua_State *L ) {
 	char *filename = (char*) lua_tostring(L, 1);
 	char *nick, *altnick, *fullname, *server, *autosendcmd;
@@ -201,49 +177,92 @@ int BotLoad( lua_State *L ) {
 	return 1;
 }
 
-// print info about bot
-void BotInfo( botState *bot ) {
-	printf( "nick: %s\naltnick: %s\nhostname: %s\nfullname: %s\n\
-server: %s\nautosendcmd: %s\nport: %i\nsocket: %i\nplugins: %i\n",
-	bot->nick, bot->altnick, bot->hostname, bot->fullname, bot->server, 
-	bot->autosendcmd, bot->port, bot->socket, bot->pluginCount );
-}
-
-// connect bot to irc network.
-int BotConnect( botState *bot ) {
+// loads the plugin ( pluginPath ) in the bot state ( bot ).
+int BotLoadPlugin( botState *bot, char* pluginName ) {
+	lua_State *L = bot->pluginStates[bot->pluginCount] = lua_open();
 	
-	BotInfo( bot );
+	// create relative path for plugin
+	char *pluginPath = alloca( strlen( PLUGIN_PATH ) + strlen( pluginName ) );
+	sprintf( pluginPath, "%s%s", PLUGIN_PATH, pluginName );
 
-	struct sockaddr_in server_addr;
-	struct hostent *server_host;
+	// copy plugin name to mem
+	bot->pluginNames[bot->pluginCount] = malloc( strlen( pluginName ) + 1 );
+	strcpy( bot->pluginNames[bot->pluginCount], pluginName );
+	
+	// load a new lua state
+	luaL_openlibs( L );
+	int loadStatus = luaL_loadfile( L, pluginPath );
 
-	bot->socket = socket( AF_INET, SOCK_STREAM, 0 );
-
-	if ( bot->socket < 0 ) {
-		fprintf( stderr, "Failed to create socket [%i]\n", errno );
-		perror( "socket" );
-		return 0;
+	// some error checking
+	switch( loadStatus ) {
+		case LUA_ERRFILE:
+			printf( "couldn't open %s.", pluginPath );
+			return 0;
+		case LUA_ERRMEM:
+			printf( "memory error in %s.", pluginPath );
+			return 0;
+		case LUA_ERRSYNTAX:
+			printf( "syntax error in %s.", pluginPath );
+			lua_error( L );
+			return 0;
+		case 0: // success
+			printf( "successfully loaded %s", pluginPath );
+			break;
+		default:
+			printf( "unknown error %i in %s", loadStatus, pluginPath );
 	}
 
-	printf( "trying to resolve hostname: %s\n", bot->hostname );
-	server_host = gethostbyname( bot->hostname );
-	if ( server_host == NULL ) {
-		fprintf( stderr, "failed to lookup hostname [%i]\n", errno );
-		perror( "gethostbyname" );
-		return 0;
-	}
-	
-	server_addr.sin_addr = *(struct in_addr *) server_host->h_addr_list[0];
-	server_addr.sin_port = htons( bot->port );
-	server_addr.sin_family = AF_INET;
-	
-	if ( connect( bot->socket, (struct sockaddr*) &server_addr, sizeof( server_addr ) ) < 0 ) {
-		fprintf( stderr, "error connecting[%i]", errno );
-		perror( "connect" );
-		return 0;
-	}
+	// this is the plugins ptr to the bot in which it sits in.
+	lua_pushlightuserdata( L, bot );
+	lua_setglobal( L, "botptr" );
 
-	printf( "connected!\n" );
+	// let lua know about some functions
+	BotGiveEvents( bot, bot->pluginCount );
+
+	lua_pcall( L, 0, 0, 0 );
+
+	bot->pluginCount++;
 
 	return 1;
 }
+
+// disconnects bot, destroys lua instances and cleans up.
+void BotUnload( botState *bot ) {
+
+	// simply for debugging
+	char* name = alloca( strlen( bot->nick ) + 1);
+	strcpy( name, bot->nick );
+
+	// unload plugins.
+	for( int i = 0; i < bot->pluginCount; i++ ) {
+		printf( "unloading %s\n", bot->pluginNames[i] );
+		lua_close( bot->pluginStates[i] );
+		free( bot->pluginNames[i] );
+	}
+
+	free( bot->nick );
+	free( bot->altnick );
+	free( bot->fullname );
+	free( bot->autosendcmd );
+	free( bot->rawCarry );
+
+	if ( bot->hostname == bot->server ) {
+		free( bot->server );
+	} else {
+		free( bot->server );
+		free( bot->hostname );
+	}
+	
+	// free memory we use for dealing with individual lines
+	for( int i = 0; i < PROTOCOL_FIELDS; i++ )
+		free( bot->msg[i] );
+
+	// the array
+	free( bot->msg );
+
+	Log( bot, "finished cleaning up\n" );
+
+	printf( "finished cleaning up bot [%s]\n", name );
+}
+
+

@@ -18,20 +18,19 @@
 #include "def.h"
 #include "events.h"
 
-int IRCSendRaw( botState *bot, char *format, ... );
-int IRCParse( botState *bot, char *line );
-int IRCParseRaw( botState *bot, char *buffer ); 
 void IRCHandleConnection( botState *bot );
-
 void IRCJoinChannel( botState *bot, char *channel );
+int  IRCParse( botState *bot, char *line );
+int  IRCParseRaw( botState *bot, char *buffer ); 
+int  IRCSendRaw( botState *bot, char *format, ... );
 void IRCSendMessage( botState *bot, char *to, char *msg );
-void IRCSetNick( botState *bot, char *nick );
 void IRCSendUser( botState *bot );
 void IRCSendPong( botState *bot, char *msg );
 void IRCSendPing( botState *bot, char *msg );
 void IRCSendMode( botState *bot, char *mode );
+void IRCSetNick( botState *bot, char *nick );
 
-// USER username "username.com" "hostnames" :nick
+// move this
 void LoadGlobalConfig();
 
 #endif

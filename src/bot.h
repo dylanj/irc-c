@@ -21,10 +21,11 @@
 extern botState BotStates[MAX_BOTS];
 extern int botCount;
 
-void BotInfo( botState *bot );
-int BotLoad( lua_State *L );
-void BotUnload( botState *bot );
-int BotConnect( botState *bot );
-int BotLoadPlugin( botState *bot, char *pluginName );
+int  BotConnect( botState *bot );
 void BotGiveEvents( botState *bot, int pluginId );
+void BotInfo( botState *bot );
+int  BotLoad( lua_State *L );
+int  BotLoadPlugin( botState *bot, char *pluginName );
+void BotUnload( botState *bot );
+
 #endif

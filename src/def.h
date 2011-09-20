@@ -33,6 +33,7 @@ typedef struct botstate_s {
 	int   pluginCount;
 
 	lua_State *pluginStates[MAX_PLUGINS];	// lua states.
+	char	*pluginNames[MAX_PLUGINS];
 } botState;
 
 void Log( botState *bot, char *format, ... ); 
