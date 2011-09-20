@@ -19,21 +19,21 @@
 #define MAX_BOTS 5
 
 typedef struct botstate_s {
-	int  port;
-	char *nick;				// nick namee
-	char *altnick;				// nick name
-	char *hostname;			// host
-	char *fullname;			// full name of bot
-	char *server;			// server to connect to
-	char *autosendcmd;			// commands to send to server on connect.
-	char *rawCarry;			// the contents of an incomplete irc message
-	char **msg;				// memory to store parsed info from messages
-	FILE *log;
-	int   socket;			 	// server socket
-	int   pluginCount;
+    int  port;
+    char *nick;             // nick namee
+    char *altnick;              // nick name
+    char *hostname;         // host
+    char *fullname;         // full name of bot
+    char *server;           // server to connect to
+    char *autosendcmd;          // commands to send to server on connect.
+    char *rawCarry;         // the contents of an incomplete irc message
+    char **msg;             // memory to store parsed info from messages
+    FILE *log;
+    int   socket;               // server socket
+    int   pluginCount;
 
-	lua_State *pluginStates[MAX_PLUGINS];	// lua states.
-	char	*pluginNames[MAX_PLUGINS];
+    lua_State *pluginStates[MAX_PLUGINS];   // lua states.
+    char    *pluginNames[MAX_PLUGINS];
 } botState;
 
 void Log( botState *bot, char *format, ... ); 

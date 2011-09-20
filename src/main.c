@@ -5,19 +5,19 @@
 #include "bot.h"
 
 int main( int argc, char** argv ) {
-	
-	LoadGlobalConfig();
+    
+    LoadGlobalConfig();
 
-	if ( BotConnect ( &BotStates[0] ) ) {
-		// init
-		IRCSetNick( &BotStates[0], NULL );
-		IRCSendUser( &BotStates[0] );
+    if ( BotConnect ( &BotStates[0] ) ) {
+        // init
+        IRCSetNick( &BotStates[0], NULL );
+        IRCSendUser( &BotStates[0] );
 
-		IRCHandleConnection( &BotStates[0] );
-	}
-	
-	BotUnload( &BotStates[0] ); //only one bot loaded so far.
+        IRCHandleConnection( &BotStates[0] );
+    }
+    
+    BotUnload( &BotStates[0] ); //only one bot loaded so far.
 
-	return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }
 

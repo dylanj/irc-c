@@ -1,0 +1,1 @@
+LoadBot( "gamesurge.lua" )

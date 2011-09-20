@@ -15,3 +15,7 @@ obj/
 *.la
 *.a
 
+# p3q files
+*.log
+*.swp
+src/tags
