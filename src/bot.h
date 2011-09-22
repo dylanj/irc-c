@@ -13,6 +13,7 @@
 #include <netdb.h>
 
 #include "def.h"
+#include "plugin.h"
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
@@ -24,9 +25,5 @@ extern int botCount;
 int  BotConnect( botState *bot );
 void BotGiveEvents( botState *bot, int pluginId );
 void BotInfo( botState *bot );
-int  BotLoad( lua_State *L );
-int  BotLoadPlugin( botState *bot, char *pluginName );
-int  BotReloadPlugin( botState *bot, int pluginId );
-void BotUnload( botState *bot );
 
 #endif

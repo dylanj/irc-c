@@ -11,8 +11,8 @@ OUTDIR=bin
 vpath %.c src
 vpath %.h src
 
-objects = $(addprefix $(OBJDIR)/, main.o bot.o events.o irc.o luafunc.o list.o)
-headers = $(bot.h events.h irc.h luafunc.h list.h)
+objects = $(addprefix $(OBJDIR)/, main.o bot.o events.o irc.o luafunc.o list.o channels.o)
+headers = $(bot.h events.h irc.h luafunc.h list.h channels.h)
 
 ku: $(objects)
 	$(CC) $(CPPFLAGS) -g -o $(OUTDIR)/$(PROGRAM) $(objects) $(LDLIBS)

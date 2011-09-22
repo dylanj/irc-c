@@ -1,4 +1,5 @@
 #include "bot.h"
+#include "events.h"
 
 botState BotStates[MAX_BOTS];
 int botCount = 0;
@@ -50,15 +51,15 @@ void BotGiveEvents( botState *bot, int pluginId ) {
     lua_register( bot->pluginStates[pluginId], "JoinChannel", LUAJoinChannel );
     lua_register( bot->pluginStates[pluginId], "GetChannels", LUAGetChannels );
     lua_register( bot->pluginStates[pluginId], "GetUsers", LUAGetUsers );
+    lua_register( bot->pluginStates[pluginId], "GetServerInfo", LUAGetServerInfo );
 }
 
 // print info about bot
 void BotInfo( botState *bot ) {
-    printf( "nick: %s\naltnick: %s\nhostname: %s\nfullname: %s\n\
-server: %s\nautosendcmd: %s\nport: %i\nsocket: %i\nplugin count: %i\nplugins:\n",
-    bot->nick, bot->altnick, bot->hostname, bot->fullname, bot->server, 
-    bot->autosendcmd, bot->port, bot->socket, bot->pluginCount );
+	printf( "maxnicklength: %i\nawaylength: %i\ntopiclength: %i\nkicklength: %i\nchannellength: %i\nmaxchannellen: %i\nnetwork name: %s\n",	bot->maxnicklen, bot->awaylen, bot->topiclength, bot->kicklen, bot->channellen, bot->maxchannellen, bot->networkName );
     
+	printf( "nick: %s\naltnick: %s\nhostname: %s\nfullname: %s\n server: %s\nautosendcmd: %s\nport: %i\nsocket: %i\nplugin count: %i\nplugins:\n", bot->nick, bot->altnick, bot->hostname, bot->fullname, bot->server, bot->autosendcmd, bot->port, bot->socket, bot->pluginCount );
+   	 
     for( int i = 0; i < bot->pluginCount; i++ ) {
         printf( "%i: %s\n", i, bot->pluginNames[i] );
     }
@@ -70,7 +71,9 @@ int BotLoad( lua_State *L ) {
     char *nick, *altnick, *fullname, *server, *autosendcmd;
     
     BotStates[botCount].log = fopen( "./raw.log", "w+" );
-    if ( BotStates[botCount].log == NULL ) {
+    BotStates[botCount].globalState = lua_open();
+
+	if ( BotStates[botCount].log == NULL ) {
         printf( "problem opening dealing with logfile\n" );
     }
     
@@ -179,15 +182,34 @@ int BotLoad( lua_State *L ) {
 
 // loads the plugin ( pluginPath ) in the bot state ( bot ).
 int BotLoadPlugin( botState *bot, char* pluginName ) {
-    lua_State *L = bot->pluginStates[bot->pluginCount] = lua_open();
     
+	int	pluginId = -1;
+	for ( int i = 0; i < MAX_PLUGINS; i++ ) {
+		if ( bot->pluginStates[i] == NULL ) {
+			pluginId = i;
+			break;
+		}
+	}
+
+	if ( pluginId == -1 ) {
+		printf( "can't load any more plugins\n" );
+		return 0;
+	}
+
+	printf( "pluginID: %i\n", pluginId );
+
+    lua_State *L = bot->pluginStates[pluginId] = lua_open();
+   
+
+   	assert( L != NULL );
+
     // create relative path for plugin
     char *pluginPath = alloca( strlen( PLUGIN_PATH ) + strlen( pluginName ) );
     sprintf( pluginPath, "%s%s", PLUGIN_PATH, pluginName );
 
     // copy plugin name to mem
-    bot->pluginNames[bot->pluginCount] = malloc( strlen( pluginName ) + 1 );
-    strcpy( bot->pluginNames[bot->pluginCount], pluginName );
+    bot->pluginNames[pluginId] = malloc( strlen( pluginName ) + 1 );
+    strcpy( bot->pluginNames[pluginId], pluginName );
     
     // load a new lua state
     luaL_openlibs( L );
@@ -217,10 +239,12 @@ int BotLoadPlugin( botState *bot, char* pluginName ) {
     lua_setglobal( L, "botptr" );
 
     // let lua know about some functions
-    BotGiveEvents( bot, bot->pluginCount );
+    BotGiveEvents( bot, pluginId );
 
     lua_pcall( L, 0, 0, 0 );
-
+   
+    OnLoad( bot, pluginId ); // let plugin know it's been loaded!
+    
     bot->pluginCount++;
 
     return 1;
@@ -236,9 +260,13 @@ void BotUnload( botState *bot ) {
     // unload plugins.
     for( int i = 0; i < bot->pluginCount; i++ ) {
         printf( "unloading %s\n", bot->pluginNames[i] );
+        OnUnload( bot, i );
         lua_close( bot->pluginStates[i] );
         free( bot->pluginNames[i] );
     }
+	
+	// unload bot-wide lua state
+	free( bot->globalState );
 
     free( bot->nick );
     free( bot->altnick );
@@ -252,7 +280,15 @@ void BotUnload( botState *bot ) {
         free( bot->server );
         free( bot->hostname );
     }
-    
+
+	// free info grabbed from 005
+	if ( bot->networkName ) free( bot->networkName );
+	if ( bot->chanTypes ) free( bot->chanTypes );
+	if ( bot->prefix ) free( bot->prefix );
+	if ( bot->statusMsg ) free( bot->statusMsg );
+	if ( bot->chanModes ) free( bot->chanModes );
+	if ( bot->caseMapping ) free( bot->caseMapping );
+
     // free memory we use for dealing with individual lines
     for( int i = 0; i < PROTOCOL_FIELDS; i++ )
         free( bot->msg[i] );
@@ -262,7 +298,9 @@ void BotUnload( botState *bot ) {
 
     Log( bot, "finished cleaning up\n" );
 
-    printf( "finished cleaning up bot [%s]\n", name );
+	fclose( bot->log );
+	bot->pluginCount--;
+    
+	printf( "finished cleaning up bot [%s]\n", name );
 }
-
 
